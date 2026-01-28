@@ -72,14 +72,15 @@ If you're using client secrets (instead of federated credentials):
 
 ## Step 4: Configure Copilot Studio Agent
 
-1. **Enable Direct Line Channel**
+1. **Get Direct Line Secret**
    - Go to [Copilot Studio](https://web.powerva.microsoft.com/)
    - Open your agent
-   - Go to **"Channels"** in the left navigation
-   - Find **"Direct Line"** and click to open
-   - If not already enabled, click **"Add"** or **"Configure"**
-   - Copy the **Secret** - this is your `DIRECT_LINE_SECRET` for the `.env` file
-   - (Optional) Enable **"Enhanced authentication"** for additional security
+   - Go to **"Settings"** → **"Security"** → **"Web channel security"**
+   - Enable web channel security (if not already enabled)
+   - You'll see two Direct Line secrets displayed - copy either one
+   - This is your `DIRECT_LINE_SECRET` for the `.env` file
+   - (Optional) Enable **"Require secure access"** to enforce token-based authentication
+   - Note: Direct Line access is available by default - you don't need to enable a separate "channel"
 
 2. **Configure Manual Authentication**
    - Go to **"Settings"** → **"Security"** → **"Authentication"**
@@ -109,7 +110,7 @@ ENTRA_CLIENT_ID=your-application-client-id
 # From Step 3 (if using client secrets)
 ENTRA_CLIENT_SECRET=your-client-secret-value
 
-# From Step 4
+# From Step 3 (Settings > Security > Web channel security)
 DIRECT_LINE_SECRET=your-direct-line-secret
 
 # Optional
@@ -157,8 +158,9 @@ LOG_FILE=logs/copilot_directline.log
 
 5. **Direct Line authentication fails**
    - Verify your `DIRECT_LINE_SECRET` is correct
-   - Check that the Direct Line channel is enabled in Copilot Studio
+   - Check that web channel security is enabled in Copilot Studio (Settings > Security)
    - Ensure the agent is published
+   - Verify you copied the secret correctly (no extra spaces or characters)
 
 For more troubleshooting help, see [troubleshooting.md](troubleshooting.md).
 

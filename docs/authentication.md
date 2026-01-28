@@ -136,7 +136,7 @@ Enhanced authentication provides additional security by embedding user informati
 
 - User ID must start with `dl_` prefix
 - User ID should be unguessable (use UUIDs)
-- Enable enhanced authentication in Direct Line channel settings
+- Enable "Require secure access" in Copilot Studio (Settings > Security > Web channel security)
 
 ### Implementation
 

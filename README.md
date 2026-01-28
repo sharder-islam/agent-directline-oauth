@@ -18,7 +18,7 @@ A secure Python solution for accessing Copilot Studio agents via Direct Line API
 - Python 3.9 or higher
 - [uv](https://github.com/astral-sh/uv) package manager
 - Microsoft Entra ID app registration
-- Copilot Studio agent with Direct Line channel enabled
+- Copilot Studio agent (Direct Line secrets available in Settings > Security)
 - Direct Line secret from Copilot Studio
 
 ### Installation
@@ -140,7 +140,7 @@ All configuration is done via environment variables in the `.env` file:
 | `ENTRA_TENANT_ID` | Microsoft Entra ID tenant ID | Yes |
 | `ENTRA_CLIENT_ID` | App registration client ID | Yes |
 | `ENTRA_CLIENT_SECRET` | Client secret (for confidential clients) | Optional |
-| `DIRECT_LINE_SECRET` | Direct Line channel secret | Yes |
+| `DIRECT_LINE_SECRET` | Direct Line secret (from Settings > Security > Web channel security) | Yes |
 | `DIRECT_LINE_ENDPOINT` | Direct Line API endpoint | No (defaults to standard) |
 | `LOG_LEVEL` | Logging level (DEBUG, INFO, WARNING, ERROR) | No (defaults to INFO) |
 | `LOG_FILE` | Log file path | No (defaults to `logs/copilot_directline.log`) |

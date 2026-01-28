@@ -134,7 +134,7 @@ Failed to acquire token: User canceled authentication
 
 **Solutions:**
 1. Verify Direct Line secret:
-   - Go to Copilot Studio → Channels → Direct Line
+   - Go to Copilot Studio → Settings → Security → Web channel security
    - Copy the secret again
    - Update `.env` file
 
