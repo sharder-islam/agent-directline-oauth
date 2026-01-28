@@ -21,19 +21,32 @@ log_level = os.getenv("LOG_LEVEL", "INFO")
 
 os.makedirs(os.path.dirname(log_file) if os.path.dirname(log_file) else ".", exist_ok=True)
 
-# Configure logging - only to file by default, console only for errors
-logging.basicConfig(
-    level=getattr(logging, log_level.upper()),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.FileHandler(log_file),
-    ],
-)
-# Add console handler only for warnings and errors
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.WARNING)
-console_handler.setFormatter(logging.Formatter("%(levelname)s - %(message)s"))
-logging.getLogger().addHandler(console_handler)
+# Configure logging - suppress INFO from copilot_directline modules in console
+# Note: directline and auth modules set up their own logging via basicConfig
+root_logger = logging.getLogger()
+
+# Find and modify existing StreamHandlers to suppress copilot_directline INFO
+class SuppressDirectLineInfoFilter(logging.Filter):
+    def filter(self, record):
+        # Allow OAuth URL from msal.oauth2cli (needed for manual extraction)
+        msg = record.getMessage()
+        if 'msal.oauth2cli' in record.name and ('Open a browser' in msg or 'login.microsoftonline.com' in msg):
+            return True
+        # Suppress INFO messages from copilot_directline modules
+        if record.name.startswith('copilot_directline') and record.levelno == logging.INFO:
+            return False
+        # Allow WARNING and above for all modules
+        return record.levelno >= logging.WARNING
+
+# Update existing StreamHandlers
+for handler in root_logger.handlers[:]:
+    if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
+        # Add filter to suppress copilot_directline INFO but allow OAuth URL
+        handler.addFilter(SuppressDirectLineInfoFilter())
+        # Set level to INFO so OAuth URL can pass through filter
+        handler.setLevel(logging.INFO)
+        # Simplify formatter for console
+        handler.setFormatter(logging.Formatter("%(levelname)s - %(message)s"))
 
 logger = logging.getLogger(__name__)
 
@@ -220,6 +233,7 @@ def main(message: Optional[str], conversation_id: Optional[str], no_auth: bool, 
                     conversation.token,
                     user_token=user_token  # Include user token for authenticated conversations
                 )
+                
                 # Update watermark after sending to only get new activities
                 try:
                     current_activities = client.get_activities(
@@ -244,8 +258,19 @@ def main(message: Optional[str], conversation_id: Optional[str], no_auth: bool, 
             poll_interval = 1.0
             found_responses = False
             
+            # Show loading indicator
+            spinner_chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+            spinner_idx = 0
+            spinner_shown = False
+            
             for poll_count in range(max_polls):
-                time.sleep(poll_interval)
+                if poll_count > 0:
+                    time.sleep(poll_interval)
+                
+                # Update spinner
+                click.echo(f"\r{spinner_chars[spinner_idx % len(spinner_chars)]} ", nl=False)
+                spinner_idx += 1
+                spinner_shown = True
                 
                 try:
                     activities_response = client.get_activities(
@@ -310,6 +335,10 @@ def main(message: Optional[str], conversation_id: Optional[str], no_auth: bool, 
                                 seen_activity_ids.add(activity.id)
                                 continue
                             
+                            # Clear spinner before printing message
+                            if spinner_shown:
+                                click.echo("\r" + " " * 2 + "\r", nl=False)
+                                spinner_shown = False
                             print_message(activity, is_bot=True)
                             found_responses = True
                             new_activities_found = True
@@ -319,6 +348,10 @@ def main(message: Optional[str], conversation_id: Optional[str], no_auth: bool, 
                             if debug:
                                 logger.debug(f"Bot sent {activity.type} activity: {activity.text or '(no text)'}")
                             if activity.text:
+                                # Clear spinner before printing
+                                if spinner_shown:
+                                    click.echo("\r" + " " * 2 + "\r", nl=False)
+                                    spinner_shown = False
                                 click.echo(f"🤖 Bot: {activity.text}")
                                 found_responses = True
                                 new_activities_found = True
@@ -348,13 +381,22 @@ def main(message: Optional[str], conversation_id: Optional[str], no_auth: bool, 
                     
                     # If we found responses and no new activities in last few polls, we're done
                     if found_responses and not new_activities_found and poll_count > 2:
+                        # Clear spinner if we're done
+                        if spinner_shown:
+                            click.echo("\r" + " " * 2 + "\r", nl=False)
                         break
                         
                 except Exception as e:
                     logger.debug(f"Error getting activities (poll {poll_count + 1}): {e}")
                     # Continue polling even if one request fails
                     if poll_count == max_polls - 1:
+                        if spinner_shown:
+                            click.echo("\r", nl=False)
                         click.echo(f"❌ Error: {e}", err=True)
+            
+            # Clear spinner if still showing
+            if spinner_shown:
+                click.echo("\r" + " " * 2 + "\r", nl=False)
             
             if not found_responses:
                 click.echo("⚠️  No response received")
