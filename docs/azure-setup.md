@@ -31,9 +31,16 @@ This guide walks you through configuring Microsoft Entra ID and Copilot Studio f
    - Copy the **Directory (tenant) ID** - you'll also need this for your `.env` file
    - Save these values securely
 
+5. **Enable Public Client Flows (Important for avoiding admin consent)**
+   - Go to **"Authentication"** under "Manage"
+   - Scroll down to **"Advanced settings"**
+   - Under **"Allow public client flows"**, select **"Yes"**
+   - Click **"Save"**
+   - This allows the app to use interactive authentication without requiring admin consent for basic OpenID scopes
+
 ## Step 2: Configure Authentication
 
-1. **Add Redirect URI**
+1. **Add Redirect URIs for Web (Bot Framework)**
    - In your app registration, go to **"Authentication"** under "Manage"
    - Click **"Add a platform"**
    - Select **"Web"**
@@ -44,6 +51,15 @@ This guide walks you through configuring Microsoft Entra ID and Copilot Studio f
      - ✅ **Access tokens (used for implicit flows)**
      - ✅ **ID tokens (used for implicit and hybrid flows)**
    - Click "Configure"
+
+2. **Add Redirect URI for Mobile/Desktop (Public Client)**
+   - Still in **"Authentication"**, click **"Add a platform"** again
+   - Select **"Mobile and desktop applications"**
+   - Under "Redirect URIs", add:
+     - `http://localhost` (MSAL will use a random port like `http://localhost:63100`, but `http://localhost` covers all ports)
+     - Optionally, you can also add `http://localhost:63100` if you want to be more specific, but `http://localhost` is recommended as it covers all dynamic ports
+   - Click "Configure"
+   - **Important**: This platform is required for the interactive authentication flow used by the CLI tool
 
 2. **Configure API Permissions**
    - Go to **"API permissions"** under "Manage"

@@ -21,14 +21,19 @@ log_level = os.getenv("LOG_LEVEL", "INFO")
 
 os.makedirs(os.path.dirname(log_file) if os.path.dirname(log_file) else ".", exist_ok=True)
 
+# Configure logging - only to file by default, console only for errors
 logging.basicConfig(
     level=getattr(logging, log_level.upper()),
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
         logging.FileHandler(log_file),
-        logging.StreamHandler(),
     ],
 )
+# Add console handler only for warnings and errors
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.WARNING)
+console_handler.setFormatter(logging.Formatter("%(levelname)s - %(message)s"))
+logging.getLogger().addHandler(console_handler)
 
 logger = logging.getLogger(__name__)
 
@@ -61,71 +66,137 @@ def print_message(activity, is_bot: bool = True):
     "-n",
     help="Display name for the user",
 )
-def main(message: Optional[str], conversation_id: Optional[str], no_auth: bool, user_name: Optional[str]):
+@click.option(
+    "--debug",
+    "-d",
+    is_flag=True,
+    help="Enable debug mode to show all activities",
+)
+def main(message: Optional[str], conversation_id: Optional[str], no_auth: bool, user_name: Optional[str], debug: bool):
     """Interactive CLI for chatting with Copilot Studio agents."""
     try:
+        # Enable debug logging if requested
+        if debug:
+            logging.getLogger("copilot_directline").setLevel(logging.DEBUG)
+            logger.setLevel(logging.DEBUG)
+        
         # Initialize Direct Line client
         client = DirectLineClient.from_env()
 
         # Authenticate if needed
         user_token = None
         if not no_auth:
-            click.echo("🔐 Authenticating with Microsoft Entra ID...")
+            click.echo("🔐 Authenticating...", nl=False)
             try:
                 auth = EntraIDAuth.from_env()
                 token_result = auth.acquire_token_interactive()
                 user_token = token_result.get("access_token")
                 if user_token:
-                    click.echo("✅ Authentication successful!")
+                    click.echo(" ✅")
                 else:
-                    click.echo("⚠️  No access token received, continuing without user auth")
+                    click.echo(" ⚠️  (no token)")
             except Exception as e:
-                click.echo(f"⚠️  Authentication failed: {e}", err=True)
-                click.echo("Continuing without user authentication...")
+                click.echo(f" ❌ Failed: {e}", err=True)
+                click.echo("Continuing without authentication...")
 
         # Start or continue conversation
         if conversation_id:
-            click.echo(f"📝 Continuing conversation: {conversation_id}")
             conversation = Conversation(
                 conversation_id=conversation_id,
                 token=client.secret,  # Use secret for existing conversation
                 expires_in=0,
             )
         else:
-            click.echo("🚀 Starting new conversation...")
             if user_token:
                 conversation = client.start_conversation(
                     user_token=user_token, user_name=user_name
                 )
             else:
                 conversation = client.start_conversation(user_name=user_name)
-            click.echo(f"✅ Conversation started: {conversation.conversation_id}")
 
         # Single message mode
         if message:
-            click.echo(f"\n📤 Sending: {message}")
-            client.send_message(conversation.conversation_id, message, conversation.token)
-
-            # Wait a bit for response
-            time.sleep(2)
-
-            # Get activities
-            activities_response = client.get_activities(
-                conversation.conversation_id, token=conversation.token
+            click.echo(f"You: {message}")
+            client.send_message(
+                conversation.conversation_id, 
+                message, 
+                conversation.token,
+                user_token=user_token  # Include user token for authenticated conversations
             )
 
-            # Print bot responses
-            for activity in activities_response.activities:
-                if activity.type == "message" and activity.from_user.get("id") != client.user_id:
-                    print_message(activity, is_bot=True)
+            # Wait for response and poll for bot messages
+            max_polls = 10
+            poll_interval = 1.0
+            watermark = None
+            
+            for poll_count in range(max_polls):
+                time.sleep(poll_interval)
+                
+                try:
+                    activities_response = client.get_activities(
+                        conversation.conversation_id,
+                        watermark=watermark,
+                        token=conversation.token,
+                    )
+                    
+                    if activities_response.watermark:
+                        watermark = activities_response.watermark
+                    
+                    # Print bot responses (messages not from the user)
+                    found_any = False
+                    for activity in activities_response.activities:
+                        from_id = activity.from_user.get("id", "")
+                        from_role = activity.from_user.get("role", "")
+                        
+                        # Bot messages are those that:
+                        # 1. Are of type "message"
+                        # 2. Have a from_user.id that's different from our user_id, OR
+                        # 3. Have a role of "bot", OR
+                        # 4. Don't have an id field (some bots don't set it)
+                        is_bot_message = (
+                            activity.type == "message" and 
+                            (
+                                from_role == "bot" or
+                                (from_id and from_id != client.user_id) or
+                                (not from_id and activity.text)  # If no from_id but has text, likely bot
+                            )
+                        )
+                        
+                        if is_bot_message:
+                            print_message(activity, is_bot=True)
+                            found_any = True
+                    
+                    # If we found responses and no new activities, we're done
+                    if found_any and poll_count > 2:
+                        break
+                        
+                except Exception as e:
+                    logger.debug(f"Error getting activities (poll {poll_count + 1}): {e}")
+                    if poll_count == max_polls - 1:
+                        click.echo(f"❌ Error: {e}", err=True)
 
-            click.echo(f"\n💡 Conversation ID: {conversation.conversation_id}")
             return
 
         # Interactive mode
-        click.echo("\n💬 Interactive chat mode (type 'exit' or 'quit' to end)\n")
+        click.echo("\n💬 Chat mode (type 'exit' or 'quit' to end)\n")
 
+        # Initialize watermark by getting initial activities
         watermark = None
+        seen_activity_ids = set()  # Track activities we've already shown
+        
+        try:
+            initial_activities = client.get_activities(
+                conversation.conversation_id,
+                token=conversation.token,
+            )
+            watermark = initial_activities.watermark
+            # Mark initial activities as seen
+            for activity in initial_activities.activities:
+                seen_activity_ids.add(activity.id)
+            logger.debug(f"Initial watermark: {watermark}, seen {len(seen_activity_ids)} activities")
+        except Exception as e:
+            logger.debug(f"Could not get initial activities: {e}")
+        
         while True:
             # Get user input
             try:
@@ -144,31 +215,149 @@ def main(message: Optional[str], conversation_id: Optional[str], no_auth: bool, 
             # Send message
             try:
                 client.send_message(
-                    conversation.conversation_id, user_input, conversation.token
+                    conversation.conversation_id, 
+                    user_input, 
+                    conversation.token,
+                    user_token=user_token  # Include user token for authenticated conversations
                 )
+                # Update watermark after sending to only get new activities
+                try:
+                    current_activities = client.get_activities(
+                        conversation.conversation_id,
+                        watermark=watermark,
+                        token=conversation.token,
+                    )
+                    if current_activities.watermark:
+                        watermark = current_activities.watermark
+                        # Mark current activities as seen
+                        for activity in current_activities.activities:
+                            seen_activity_ids.add(activity.id)
+                except Exception as e:
+                    logger.debug(f"Could not update watermark after sending: {e}")
             except Exception as e:
                 click.echo(f"❌ Error sending message: {e}", err=True)
                 continue
 
-            # Wait for response
-            time.sleep(1)
-
-            # Get new activities
-            try:
-                activities_response = client.get_activities(
-                    conversation.conversation_id,
-                    watermark=watermark,
-                    token=conversation.token,
-                )
-                watermark = activities_response.watermark
-
-                # Print bot responses
-                for activity in activities_response.activities:
-                    if activity.type == "message" and activity.from_user.get("id") != client.user_id:
-                        print_message(activity, is_bot=True)
-
-            except Exception as e:
-                click.echo(f"❌ Error getting activities: {e}", err=True)
+            # Wait for response and poll for bot messages
+            # Poll multiple times as bot responses may take a few seconds
+            max_polls = 10
+            poll_interval = 1.0
+            found_responses = False
+            
+            for poll_count in range(max_polls):
+                time.sleep(poll_interval)
+                
+                try:
+                    activities_response = client.get_activities(
+                        conversation.conversation_id,
+                        watermark=watermark,
+                        token=conversation.token,
+                    )
+                    new_watermark = activities_response.watermark
+                    
+                    # Print bot responses (messages not from the user)
+                    new_activities_found = False
+                    for activity in activities_response.activities:
+                        # Skip activities we've already seen
+                        if activity.id in seen_activity_ids:
+                            continue
+                        
+                        # Bot activities have from_user.id that's different from client.user_id
+                        # or they might have a role field set to "bot"
+                        from_id = activity.from_user.get("id", "")
+                        from_role = activity.from_user.get("role", "")
+                        is_from_bot = (
+                            from_role == "bot" or
+                            (from_id and from_id != client.user_id) or
+                            (not from_id)  # If no from_id, likely from bot
+                        )
+                        
+                        # Log bot activities for debugging (only to file, not console)
+                        if is_from_bot and debug:
+                            logger.debug(
+                                f"Bot activity: id={activity.id}, type={activity.type}, "
+                                f"text={activity.text[:100] if activity.text else '(no text)'}, "
+                                f"attachments={len(activity.attachments) if activity.attachments else 0}"
+                            )
+                            if activity.type != "message":
+                                click.echo(f"🔍 [DEBUG] Bot sent {activity.type} activity")
+                        
+                        # Handle message activities
+                        if activity.type == "message" and is_from_bot:
+                            # Skip activities with no text (empty messages) unless they have attachments
+                            if not activity.text or not activity.text.strip():
+                                if activity.attachments:
+                                    # Show message about attachments
+                                    click.echo(f"🤖 Bot: [Message with {len(activity.attachments)} attachment(s)]")
+                                    # In debug mode, show attachment details
+                                    if debug:
+                                        for att in activity.attachments:
+                                            click.echo(f"   📎 Attachment: {att.get('contentType', 'unknown')}")
+                                            if 'content' in att:
+                                                content = att['content']
+                                                if isinstance(content, dict):
+                                                    if 'buttons' in content:
+                                                        click.echo(f"   🔘 Buttons: {len(content['buttons'])}")
+                                                    if 'text' in content:
+                                                        click.echo(f"   📝 Content text: {content['text'][:100]}")
+                                    found_responses = True
+                                    new_activities_found = True
+                                elif debug:
+                                    # In debug mode, show empty activities to help diagnose
+                                    click.echo(f"🔍 [DEBUG] Bot sent empty message activity (id: {activity.id})")
+                                    if activity.channel_data:
+                                        click.echo(f"   Channel data: {activity.channel_data}")
+                                seen_activity_ids.add(activity.id)
+                                continue
+                            
+                            print_message(activity, is_bot=True)
+                            found_responses = True
+                            new_activities_found = True
+                        
+                        # Handle other activity types (like sign-in cards, OAuth cards, etc.)
+                        elif activity.type in ["invoke", "event"] and is_from_bot:
+                            if debug:
+                                logger.debug(f"Bot sent {activity.type} activity: {activity.text or '(no text)'}")
+                            if activity.text:
+                                click.echo(f"🤖 Bot: {activity.text}")
+                                found_responses = True
+                                new_activities_found = True
+                        
+                        # Check for attachments (sign-in cards, OAuth cards, etc.)
+                        if activity.attachments and is_from_bot:
+                            for attachment in activity.attachments:
+                                content_type = attachment.get("contentType", "")
+                                if "signin" in content_type.lower() or "oauth" in content_type.lower():
+                                    if debug:
+                                        logger.debug(f"Sign-in card detected: {attachment}")
+                                    # Only show sign-in cards in debug mode
+                                    if debug:
+                                        click.echo(f"🤖 Bot: [Sign-in card detected]")
+                                    found_responses = True
+                                    new_activities_found = True
+                        
+                        # Mark this activity as seen
+                        seen_activity_ids.add(activity.id)
+                    
+                    # Update watermark for next poll only if we got new activities
+                    if new_watermark and new_activities_found:
+                        watermark = new_watermark
+                    elif new_watermark:
+                        # Still update watermark even if no new bot messages (to avoid re-fetching)
+                        watermark = new_watermark
+                    
+                    # If we found responses and no new activities in last few polls, we're done
+                    if found_responses and not new_activities_found and poll_count > 2:
+                        break
+                        
+                except Exception as e:
+                    logger.debug(f"Error getting activities (poll {poll_count + 1}): {e}")
+                    # Continue polling even if one request fails
+                    if poll_count == max_polls - 1:
+                        click.echo(f"❌ Error: {e}", err=True)
+            
+            if not found_responses:
+                click.echo("⚠️  No response received")
 
     except Exception as e:
         logger.exception("CLI error")

@@ -27,8 +27,8 @@ copilot-chat = "src.cli.main:main"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[tool.hatchling.build]
-packages = ["src/copilot_directline", "src/cli"]
+[tool.hatch.build.targets.wheel]
+packages = ["src/copilot_directline"]
 
 [tool.ruff]
 line-length = 100

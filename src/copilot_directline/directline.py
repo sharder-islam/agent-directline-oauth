@@ -135,11 +135,11 @@ class DirectLineClient:
             Conversation object
         """
         url = f"{self.base_url}/conversations"
-        headers = self._get_headers()
+        headers = self._get_headers()  # Always use Direct Line secret/token in Authorization header
 
-        # If user_token is provided, include it in headers for authentication
-        if user_token:
-            headers["Authorization"] = f"Bearer {user_token}"
+        # Note: user_token from Entra ID is not passed directly to Direct Line API
+        # Direct Line uses its own secret/token for API authentication
+        # User authentication is handled separately by Copilot Studio when the bot requests sign-in
 
         payload: Dict[str, any] = {}
         if user_id or self.user_id:
@@ -160,7 +160,12 @@ class DirectLineClient:
         return conversation
 
     def send_message(
-        self, conversation_id: str, message: str, token: Optional[str] = None
+        self, 
+        conversation_id: str, 
+        message: str, 
+        token: Optional[str] = None,
+        user_token: Optional[str] = None,
+        channel_data: Optional[Dict[str, any]] = None
     ) -> Dict[str, any]:
         """Send a message to the bot.
 
@@ -168,6 +173,8 @@ class DirectLineClient:
             conversation_id: ID of the conversation
             message: Message text to send
             token: Direct Line token (uses secret if not provided)
+            user_token: User access token from Entra ID (for authenticated conversations)
+            channel_data: Additional channel-specific data to include
 
         Returns:
             Response dictionary with activity ID
@@ -177,6 +184,15 @@ class DirectLineClient:
 
         message_obj = Message(text=message)
         payload = message_obj.to_dict()
+        
+        # Include user token in channelData if provided (for "Authenticate manually" mode)
+        if user_token or channel_data:
+            if not payload.get("channelData"):
+                payload["channelData"] = {}
+            if user_token:
+                payload["channelData"]["userToken"] = user_token
+            if channel_data:
+                payload["channelData"].update(channel_data)
 
         logger.info(f"Sending message to conversation: {conversation_id}")
         response = requests.post(url, headers=headers, json=payload)
@@ -222,6 +238,42 @@ class DirectLineClient:
             f"Retrieved {len(activities_response.activities)} activities for conversation: {conversation_id}"
         )
         return activities_response
+
+    def send_activity(
+        self,
+        conversation_id: str,
+        activity_type: str,
+        activity_data: Dict[str, any],
+        token: Optional[str] = None,
+    ) -> Dict[str, any]:
+        """Send an activity (not just a message) to the bot.
+        
+        Args:
+            conversation_id: ID of the conversation
+            activity_type: Type of activity (e.g., "invoke", "event")
+            activity_data: Activity data dictionary
+            token: Direct Line token (uses secret if not provided)
+            
+        Returns:
+            Response dictionary with activity ID
+        """
+        url = f"{self.base_url}/conversations/{conversation_id}/activities"
+        headers = self._get_headers(token)
+        
+        payload = {
+            "type": activity_type,
+            **activity_data
+        }
+        
+        logger.info(f"Sending {activity_type} activity to conversation: {conversation_id}")
+        response = requests.post(url, headers=headers, json=payload)
+        
+        response.raise_for_status()
+        data = response.json()
+        
+        activity_id = data.get("id", "")
+        logger.info(f"Activity sent with activity ID: {activity_id}")
+        return data
 
     def refresh_token(self, token: str) -> Conversation:
         """Refresh a Direct Line token.
