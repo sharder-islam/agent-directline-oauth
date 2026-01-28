@@ -54,8 +54,8 @@ This guide walks you through configuring Microsoft Entra ID and Copilot Studio f
      - ✅ `openid`
      - ✅ `profile`
    - Click **"Add permissions"**
-   - Click **"Grant admin consent for [Your Tenant]"** and confirm
-   - This ensures users don't need to consent individually
+   - (Optional) Click **"Grant admin consent for [Your Tenant]"** and confirm
+   - Note: Admin consent is **not required** for these basic OpenID scopes - users can consent themselves. However, granting admin consent prevents individual users from seeing consent prompts, which is recommended for organizational use.
 
 ## Step 3: Create Client Secret (Optional)
 
@@ -153,7 +153,7 @@ LOG_FILE=logs/copilot_directline.log
    - Check for typos or extra spaces
 
 4. **"Insufficient privileges"**
-   - Ensure admin consent was granted for API permissions
+   - Verify API permissions are configured (admin consent is optional for openid/profile scopes)
    - Verify the user has appropriate permissions in the tenant
 
 5. **Direct Line authentication fails**

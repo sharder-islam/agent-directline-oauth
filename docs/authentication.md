@@ -226,7 +226,7 @@ conversation = client.start_conversation(
 
 4. **"Insufficient privileges"**
    - Verify API permissions are granted
-   - Check admin consent was provided
+   - Verify API permissions are configured (admin consent is optional for openid/profile scopes)
 
 For more troubleshooting, see [troubleshooting.md](troubleshooting.md).
 

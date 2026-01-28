@@ -74,7 +74,6 @@ AADSTS65005: The application 'xxx' requested a scope 'xxx' that doesn't exist
 
 **Causes:**
 - API permissions not configured
-- Admin consent not granted
 - Wrong scopes requested
 
 **Solutions:**
@@ -84,10 +83,10 @@ AADSTS65005: The application 'xxx' requested a scope 'xxx' that doesn't exist
      - `openid` (Delegated)
      - `profile` (Delegated)
 
-2. Grant admin consent:
-   - Click "Grant admin consent for [Tenant]"
-   - Confirm the action
-   - Wait a few minutes for propagation
+2. (Optional) Grant admin consent:
+   - Click "Grant admin consent for [Tenant]" and confirm
+   - Note: Admin consent is **not required** for `openid` and `profile` scopes - users can consent themselves
+   - Admin consent is recommended to avoid individual user consent prompts in organizational environments
 
 3. Check scopes in code:
    - Default scopes are `['profile', 'openid']`
