@@ -43,7 +43,7 @@ A secure Python solution for accessing Copilot Studio agents via Direct Line API
    DIRECT_LINE_SECRET=your-direct-line-secret
    ```
 
-   See [docs/azure-setup.md](docs/azure-setup.md) for detailed Azure configuration instructions.
+   See [docs/azure-setup-mckinsey.md](docs/azure-setup-mckinsey.md) for detailed Azure configuration (Platform McKinsey / mckinsey.com tenant). For non-McKinsey tenants, see [docs/azure-setup.md](docs/azure-setup.md).
 
 ### Basic Usage
 
@@ -114,6 +114,7 @@ agent-directline-oauth/
 │   ├── examples/          # Example applications
 │   │   ├── simple_chat.py
 │   │   └── web_app.py
+│   ├── azure-setup-mckinsey.md  # Azure setup via Platform McKinsey (mckinsey.com)
 │   ├── azure-setup.md
 │   ├── api-reference.md
 │   ├── authentication.md
@@ -125,7 +126,7 @@ agent-directline-oauth/
 
 ## Documentation
 
-- **[Azure Setup Guide](docs/azure-setup.md)**: Step-by-step instructions for configuring Azure Portal, app registration, and Copilot Studio
+- **[Azure Setup Guide (McKinsey)](docs/azure-setup-mckinsey.md)**: Step-by-step instructions for Copilot Studio Direct Line + Azure App Registration via Platform McKinsey (mckinsey.com tenant). For non-McKinsey tenants, see [azure-setup.md](docs/azure-setup.md).
 - **[API Reference](docs/api-reference.md)**: Complete API documentation for the library
 - **[Authentication Deep-Dive](docs/authentication.md)**: Detailed explanation of authentication flows and security
 - **[Troubleshooting](docs/troubleshooting.md)**: Common issues and solutions
