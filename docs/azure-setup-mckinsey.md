@@ -15,18 +15,17 @@ This guide is for **Copilot Studio Direct Line + Azure App Registration** on the
 Use the links below to jump to a section.
 
 - [Prerequisites](#prerequisites)
-- [Step 1: Create or use a workspace](#step-1-create-or-use-a-workspace)
-- [Step 2: Request the Azure App Registration service](#step-2-request-the-azure-app-registration-service)
-- [Step 3: Get Client ID and Tenant ID](#step-3-get-client-id-and-tenant-id)
-- [Step 4: Generate client secret (Credentials)](#step-4-generate-client-secret-credentials)
-- [Step 5: API permissions and redirect URLs](#step-5-api-permissions-and-redirect-urls)
-  - [Prerequisites (Step 5)](#prerequisites-step-5)
+- [Step 1: Request the Azure App Registration service](#step-1-request-the-azure-app-registration-service)
+- [Step 2: Get Client ID and Tenant ID](#step-2-get-client-id-and-tenant-id)
+- [Step 3: Generate client secret (Credentials)](#step-3-generate-client-secret-credentials)
+- [Step 4: API permissions and redirect URLs](#step-4-api-permissions-and-redirect-urls)
+  - [Prerequisites (Step 4)](#prerequisites-step-4)
   - [Add API permissions](#add-api-permissions)
   - [Redirect URIs and authentication](#redirect-uris-and-authentication-for-direct-line-and-this-cli)
   - [Client secret expiration](#client-secret-expiration)
-- [Step 6: Configure Copilot Studio agent](#step-6-configure-copilot-studio-agent)
-- [Step 7: Configure environment variables](#step-7-configure-environment-variables)
-- [Step 8: Test your configuration](#step-8-test-your-configuration)
+- [Step 5: Configure Copilot Studio agent](#step-5-configure-copilot-studio-agent)
+- [Step 6: Configure environment variables](#step-6-configure-environment-variables)
+- [Step 7: Test your configuration](#step-7-test-your-configuration)
 - [Troubleshooting](#troubleshooting)
 - [Rotating secrets](#rotating-secrets)
   - [Overview of the rotation process](#overview-of-the-rotation-process)
@@ -48,18 +47,7 @@ Use the links below to jump to a section.
 
 ---
 
-## Step 1: Create or use a workspace
-
-You must have a project or product workspace in Platform McKinsey before you can add the Azure App Registration service.
-
-1. Go to [Platform McKinsey](https://platform.mckinsey.com).
-2. Create or use a workspace:
-   - [Create a Product Workspace](https://platform.mckinsey.com/knowledge-base/portal-user-guide/KO100384/create-a-product-workspace)
-   - [Set up and manage Project Workspace](https://platform.mckinsey.com/knowledge-base/portal-user-guide/KO83431/set-up-and-manage-project-workspace)
-
----
-
-## Step 2: Request the Azure App Registration service
+## Step 1: Request the Azure App Registration service
 
 1. In Platform McKinsey, search for **“Azure App Registration”** in the service catalog (or use [Add Azure App Registration service](https://platform.mckinsey.com/workspace/no-team/create-service/fb68694a-357e-4209-9cb4-27d36bf0d76a)).
 2. Click **Add to workspace** to open the **Request Service** form.
@@ -82,32 +70,32 @@ You must have a project or product workspace in Platform McKinsey before you can
 
 ---
 
-## Step 3: Get Client ID and Tenant ID
+## Step 2: Get Client ID and Tenant ID
 
 1. After the service is provisioned, you will receive an **email** at the contact address you provided (provisioning can take several hours).
 2. The email contains your **App ID** (Client ID) and **Tenant ID**—these are the values you will use for `ENTRA_CLIENT_ID` and `ENTRA_TENANT_ID` in your `.env` file and in Copilot Studio.
 3. You can also find them in your workspace: in the **App Registration** section you’ll see **App ID**, **Application Name**, **App Registration Name**, and **Tenant ID**.
-4. Save both **App ID** and **Tenant ID** securely; you’ll need them for your `.env` file, Copilot Studio (Step 6), and for requesting API permissions (Step 5).
+4. Save both **App ID** and **Tenant ID** securely; you’ll need them for your `.env` file, Copilot Studio (Step 5), and for requesting API permissions (Step 4).
 
 ---
 
-## Step 4: Generate client secret (Credentials)
+## Step 3: Generate client secret (Credentials)
 
 1. In your Platform McKinsey workspace, open the **Azure App Registration** service you added.
 2. In the **App Registration** section, click **Credentials**.
 3. In the expanded **Credentials** area, use **Add Client Secret** (or, if the platform shows a PowerShell or Bash script in a pop-up, run that script to generate a secret).
-4. **Copy and store the client secret value immediately**—it is shown only once. This is your `ENTRA_CLIENT_SECRET` for the `.env` file and for Copilot Studio manual authentication (Step 6).
+4. **Copy and store the client secret value immediately**—it is shown only once. This is your `ENTRA_CLIENT_SECRET` for the `.env` file and for Copilot Studio manual authentication (Step 5).
 
 ---
 
-## Step 5: API permissions and redirect URLs
+## Step 4: API permissions and redirect URLs
 
 Your app needs specific **API permissions** and **redirect URIs** for Direct Line and the CLI. Have Operations (Ops) or an Azure/Entra tenant admin for mckinsey.com apply the configuration below—or do it yourself if you have access.
 
-### Prerequisites (Step 5)
+### Prerequisites (Step 4)
 
-- You need an App Registration (you have this from Steps 1–4).
-- You need the **Object ID**, **Name**, and **App ID** (Client ID) of your App Registration (from your workspace / Step 3).
+- You need an App Registration (you have this from Steps 1–3).
+- You need the **Object ID**, **Name**, and **App ID** (Client ID) of your App Registration (from your workspace / Step 2).
 - The person who adds permissions or grants admin consent must be **Owner** or **Contributor** on the App Registration.
 
 **To assign Owner or Contributor:** In the Azure portal, open your App Registration → **Access control (IAM)** → **Add role assignment** → select **Owner** or **Contributor** → search for and select the user → **Review + assign**.
@@ -145,29 +133,29 @@ Client secrets for App Registrations in the mckinsey.com tenant typically expire
 
 ---
 
-## Step 6: Configure Copilot Studio agent
+## Step 5: Configure Copilot Studio agent
 
-Configure your Copilot Studio agent to use the Entra app you created (Steps 1–5):
+Configure your Copilot Studio agent to use the Entra app you created (Steps 1–4):
 
-1. **Get Direct Line secret:** [Copilot Studio](https://web.powerva.microsoft.com/) → your agent → **Settings** → **Security** → **Web channel security** → enable if needed, copy one Direct Line secret → use as `DIRECT_LINE_SECRET` in `.env`. (Optional) Enable **Require secure access**.
-2. **Configure manual authentication:** **Settings** → **Security** → **Authentication** → **Authenticate manually** → **Require users to sign in** enabled → **Service provider:** Microsoft Entra ID V2 with client secrets (or federated credentials) → enter **Client ID** (from Step 3) and **Client secret** (from Step 4) → **Scopes:** `profile openid` → **Save**.
+1. **Get Direct Line secret:** [Copilot Studio](https://copilotstudio.microsoft.com/) → your agent → **Settings** → **Security** → **Web channel security** → enable if needed, copy one Direct Line secret → use as `DIRECT_LINE_SECRET` in `.env`. (Optional) Enable **Require secure access**.
+2. **Configure manual authentication:** **Settings** → **Security** → **Authentication** → **Authenticate manually** → **Require users to sign in** enabled → **Service provider:** Microsoft Entra ID V2 with client secrets (or federated credentials) → enter **Client ID** (from Step 2) and **Client secret** (from Step 3) → **Scopes:** `profile openid` → **Save**.
 3. **Publish** the agent and test in the test panel.
 
 ---
 
-## Step 7: Configure environment variables
+## Step 6: Configure environment variables
 
 Create a `.env` file in your project root:
 
 ```env
-# From Step 3 (App ID and Tenant ID)
+# From Step 2 (App ID and Tenant ID)
 ENTRA_TENANT_ID=your-directory-tenant-id
 ENTRA_CLIENT_ID=your-application-client-id
 
-# From Step 4 (Credentials → Add Client Secret)
+# From Step 3 (Credentials → Add Client Secret)
 ENTRA_CLIENT_SECRET=your-client-secret-value
 
-# From Step 6 (Copilot Studio – Web channel security)
+# From Step 5 (Copilot Studio – Web channel security)
 DIRECT_LINE_SECRET=your-direct-line-secret
 
 # Optional
@@ -178,7 +166,7 @@ LOG_FILE=logs/copilot_directline.log
 
 ---
 
-## Step 8: Test your configuration
+## Step 7: Test your configuration
 
 1. **Auth:**  
    `uv run python -c "from copilot_directline import EntraIDAuth; auth = EntraIDAuth.from_env(); print('Auth configured correctly!')"`
